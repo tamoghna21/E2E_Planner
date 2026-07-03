@@ -220,8 +220,32 @@ constraint.
 
 ## Results
 
-All metrics are measured on **6 held-out scenarios** (3 nuScenes + 3 Waymo) that were never
-used for training or DAgger data collection.
+### Scenario breakdown
+
+The bundled mini-splits shipped with MetaDrive provide **10 nuScenes scenarios** and **3 Waymo
+scenarios** — 13 in total. They were split as follows:
+
+| dataset | indices | role | note |
+|---|---|---|---|
+| nuScenes 0–5 | 6 scenarios | **Training** (expert data collection + DAgger rollouts) | Scenario 2 is near-stationary (route length ≈ 0 m); 5 scenarios usefully contribute transitions |
+| nuScenes 6, 7, 8 | 3 scenarios | **Held-out evaluation** | All 3 usable |
+| nuScenes 9 | 1 scenario | Excluded — same near-stationary issue as scenario 2 | Not usable for evaluation |
+| Waymo 0, 1, 2 | 3 scenarios | **Held-out evaluation only** | Waymo was never used for training — it is both held-out *and* out-of-domain |
+
+**Training used nuScenes scenarios 0–5 only.** The Waymo scenarios were never seen during
+training, data collection, or DAgger rollouts. All 6 evaluation scenarios (nuScenes 6/7/8 +
+Waymo 0/1/2) were kept completely separate throughout.
+
+This matters for reading the results: the Waymo numbers are a cross-domain generalization test,
+not just a held-out split from the same dataset as the training scenarios. DAgger iterations also
+ran on nuScenes 0–5 only, which is why the one persistently failing eval scenario (`nuscenes:6`,
+a tight intersection) was never adequately covered — it lies in the eval portion of the same
+dataset as training, but its geometry was not represented in the 5 usable training routes.
+
+### Metrics
+
+All metrics are measured on the **6 held-out scenarios** that were never used for training or
+DAgger data collection.
 
 **Success %** is a strict binary pass/fail per scenario. MetaDrive marks an episode as
 "succeeded" only when the ego completes ≥ 95% of its reference route without going off-road or
