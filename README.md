@@ -223,9 +223,9 @@ constraint.
 All metrics are measured on **6 held-out scenarios** (3 nuScenes + 3 Waymo) that were never
 used for training or DAgger data collection.
 
-**Success %** is a strict binary pass/fail per scenario: 1 if the ego completed ≥ 95% of its
-logged reference route without going off-road or colliding; 0 otherwise. The percentage is the
-count of passing scenarios out of 6.
+**Success %** is a strict binary pass/fail per scenario. MetaDrive marks an episode as
+"succeeded" only when the ego completes ≥ 95% of its reference route without going off-road or
+colliding first. The percentage is the count of passing scenarios out of 6.
 
 **Route completion %** is a softer continuous metric: the fraction of the reference route the
 ego reached before the episode terminated, averaged across all 6 scenarios. A scenario where the
