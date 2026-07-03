@@ -312,7 +312,6 @@ src/utils/metrics.py                 # success / off-road / route completion / d
 src/utils/viz.py                     # headline figure and diagnostic plots
 configs/default.yaml                 # splits, model, hyperparameters
 docs/architecture.md                 # full method notes, diagnostics, and analysis
-docs/blog_outline.md                 # blog post and LinkedIn outline
 ```
 
 ## Honest limitations
