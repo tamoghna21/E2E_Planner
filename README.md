@@ -221,9 +221,22 @@ constraint.
 ## Results
 
 All metrics are measured on **6 held-out scenarios** (3 nuScenes + 3 Waymo) that were never
-used for training or DAgger data collection. "Success" means the ego vehicle completed at least
-95% of its logged reference route without leaving the road. "Route completion" is the mean
-fraction of the route reached before the episode ended.
+used for training or DAgger data collection.
+
+**Success %** is a strict binary pass/fail per scenario: 1 if the ego completed ≥ 95% of its
+logged reference route without going off-road or colliding; 0 otherwise. The percentage is the
+count of passing scenarios out of 6.
+
+**Route completion %** is a softer continuous metric: the fraction of the reference route the
+ego reached before the episode terminated, averaged across all 6 scenarios. A scenario where the
+ego leaves the road at the 60% mark contributes 60% to this average even though it counts as
+0 successes.
+
+The two metrics together tell the full story: route completion shows *how far* the ego got on
+average (including partial runs), while success shows *how many scenarios* it actually finished.
+This is why at stage (vi) success is 66.7% (4 of 6 scenarios passed the ≥ 95% threshold) while
+route completion is 76.7% (those 4 successful runs averaged ≈ 95%+, and the 2 failing scenarios
+still reached roughly 40–50% of their routes before terminating, pulling the overall average up).
 
 The full progression — from the initial broken labels through to four DAgger iterations — is
 shown in one table. The open-loop validation MSE (how well the model fits the training data) is
