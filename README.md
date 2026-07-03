@@ -5,10 +5,11 @@ evaluated *closed-loop* — the policy actually drives, it isn't just scored on 
 
 ![BC vs DAgger, Waymo scenario 0](outputs/bc_vs_dagger_waymo0.gif)
 
-*Same held-out Waymo scene, same start state. Left: plain behavior cloning. Right: after DAgger,
-the policy navigates through dense traffic and completes the route (95.8% route completion).
-In both panels the **teal/green trail is the ego vehicle's path** — the car being controlled by
-the learned policy. Surrounding vehicles replay their logged trajectories.*
+*Same held-out Waymo scene, same start state. Left: behavior cloning only (no DAgger) — the ego
+leaves the road early. Right: after 4 DAgger iterations — the policy navigates through dense
+traffic and completes the route (~95% route completion). In both panels the **teal/green trail is
+the ego vehicle's path** — the car being controlled by the learned policy. The length of the trail
+shows how far the ego got. Surrounding vehicles replay their logged trajectories.*
 
 ## How it works
 
@@ -290,18 +291,29 @@ A few things worth reading in this table:
 
 ![The finding in one figure](outputs/headline_figure.png)
 
-*Open-loop validation loss improves at every stage. Closed-loop route completion does not — it
-drops after the label fix (stage ii) then climbs as DAgger iterations add coverage of the states
-the policy actually visits during deployment.*
+*Three engineering stages shown side by side. Left panel: open-loop validation loss (how well the
+model fits training data) — it improves at every stage, falling from 0.14 to 0.068 to 0.064.
+Right panel: closed-loop mean route completion (how well the trained policy actually drives the
+held-out scenarios) — it does NOT follow the loss. Route completion drops from 29.7% to 19.7%
+when the labels are fixed (stage ii), because better labels let the car move faster, exposing the
+lateral-control gap that stalling had been hiding. It then rises in stage iii (1 DAgger
+iteration, 37.5%). The full multi-iteration recovery is shown in the chart below.*
 
 ![DAgger iteration progression](outputs/dagger_progress.png)
 
+*Success rate (left) and mean route completion (right) across 4 DAgger iterations, broken down
+by nuScenes (blue) and Waymo (orange) eval scenarios, with the overall average in grey. Both
+metrics are flat at 0% for BC-only (iteration 0), then rise sharply at iteration 2 — success
+jumps from 17% to 67% (4 of 6 scenarios completed) — and plateau through iterations 3 and 4.
+The plateau confirms the remaining limit is distribution coverage of specific road geometries,
+not the amount of DAgger data collected.*
+
 ![BC + DAgger completing a nuScenes scenario](outputs/bc_vs_dagger4_nuscenes7.gif)
 
-*nuScenes scenario 7. Left: behavior cloning baseline (stage ii). Right: after 4 DAgger
-iterations (stage vi) — the policy completes the route at 95.3%. The **teal/green trail tracks
-the ego vehicle's driven path** in real time; surrounding vehicles (random colors) replay their
-logged trajectories.*
+*nuScenes scenario 7. Left: behavior cloning with no DAgger — the teal trail is short, the ego
+leaves the road before completing the route. Right: after 4 DAgger iterations — the teal trail
+runs the full length of the route, reaching 95.3% completion. Surrounding vehicles (random
+colors) replay their logged trajectories and are not controlled by the policy.*
 
 ---
 
@@ -376,7 +388,7 @@ This is a **methodology demonstrator, not a benchmark result**:
 - The early throttle labels were physically wrong (a heuristic, not a dynamics inversion);
   diagnosing and replacing them is half the story.
 
-## What I'd do next
+## What can be done next
 
 - **More training data / a second training source** — add Waymo to *training*, or convert more
   scenarios via ScenarioNet, to test whether in-domain performance is data-bound.
