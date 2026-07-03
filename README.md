@@ -99,8 +99,14 @@ original log — it produces a physically consistent action at any position and 
 actually reaches, **including states far off the logged path**. This queryability is the property
 that makes DAgger possible.
 
-Validation: the reactive expert achieves **95%+ route completion on 5 of 6 training scenarios**
-when run closed-loop through real physics from the logged start state.
+**Expert quality check:** before using this controller as a teacher, it is run on its own through
+the real physics simulator on the training scenarios — the controller directly drives the ego, with
+no learned policy involved. It achieves **95%+ route completion on 5 of 6 training scenarios**.
+This confirms the expert itself is capable of following the logged routes through real physics,
+which is the minimum requirement for it to be a useful teacher. (The remaining 1 scenario is the
+known degenerate near-stationary clip where the route length is essentially zero.)
+This number is **not** the trained policy's performance — the policy will be evaluated separately
+in Step 7, after it has learned to imitate this expert.
 
 ---
 
@@ -214,41 +220,51 @@ constraint.
 
 ## Results
 
-**Three-stage progression** (n = 6 held-out scenarios: 3 nuScenes + 3 Waymo):
+All metrics are measured on **6 held-out scenarios** (3 nuScenes + 3 Waymo) that were never
+used for training or DAgger data collection. "Success" means the ego vehicle completed at least
+95% of its logged reference route without leaving the road. "Route completion" is the mean
+fraction of the route reached before the episode ended.
 
-| stage | pipeline steps | open-loop val MSE | success | route completion |
+The full progression — from the initial broken labels through to four DAgger iterations — is
+shown in one table. The open-loop validation MSE (how well the model fits the training data) is
+shown alongside the closed-loop result (how well the policy actually drives) to make the
+disconnect between the two visible.
+
+| pipeline stage | steps | open-loop val MSE | success (6 scenarios) | route completion |
 |---|---|---|---|---|
-| (i) heuristic labels, BC | Steps 1–3 (data problem identified) | 0.1405 | 0% | 29.7% |
-| (ii) reactive-expert labels, BC | Steps 4–7 (expert fixed → trained → evaluated) | 0.0678 | 0% | 19.7% |
-| (iii) BC + 1 DAgger iteration | Steps 8–9 (gap diagnosed → DAgger applied) | 0.0642 | 16.7% | 37.5% |
+| (i) Heuristic labels, BC | Steps 1–3 | 0.1405 | 0 / 6 — 0% | 29.7% |
+| (ii) Reactive-expert labels, BC — baseline | Steps 4–7 | 0.0678 | 0 / 6 — 0% | 19.7% |
+| (iii) + DAgger iteration 1 | Step 9 ×1 | 0.0642 | 1 / 6 — 16.7% | 37.5% |
+| (iv) + DAgger iteration 2 | Step 9 ×2 | — | **4 / 6 — 66.7%** | **76.7%** |
+| (v) + DAgger iteration 3 | Step 9 ×3 | — | 4 / 6 — 66.7% | 75.3% |
+| (vi) + DAgger iteration 4 | Step 9 ×4 | — | 4 / 6 — 66.7% | 76.1% |
 
-**DAgger iteration curve** (4 iterations beyond the BC baseline — Step 9):
+A few things worth reading in this table:
 
-| iteration | pipeline step | success | route completion |
-|---|---|---|---|
-| 0 — BC only | Steps 4–7 baseline | 0% | 19.7% |
-| 1 | Step 9, first iteration | 16.7% | 37.5% |
-| 2 | Step 9, second iteration | **66.7%** | **76.7%** |
-| 3 | Step 9, third iteration | 66.7% | 75.3% |
-| 4 | Step 9, fourth iteration | 66.7% | 76.1% |
-
-![DAgger iteration progression](outputs/dagger_progress.png)
-
-By iteration 2, **4 of 6 genuinely held-out real-world scenarios** are completed at 95%+ route
-completion. Performance then plateaus — the classic DAgger convergence signature.
+- **Open-loop loss (column 3) keeps improving** across all stages — but closed-loop success
+  (column 4) does not track it. Stage (ii) has a lower loss than stage (i) yet *worse* closed-loop
+  performance. This is the central finding, shown in the figure below.
+- **DAgger iteration 1 produces only 1 success out of 6.** The big jump — from 1/6 to 4/6 —
+  happens at iteration 2. One iteration is not enough; the distribution gap needs more coverage.
+- **Iterations 3 and 4 add ~1,750 more transitions but the success count stays at 4/6.** The
+  plateau shows the remaining limit is scenario geometry (the one persistently failing scenario,
+  `nuscenes:6`, is an intersection outside the training set's coverage), not the amount of
+  DAgger data.
 
 ![The finding in one figure](outputs/headline_figure.png)
 
-*Open-loop validation loss improves monotonically across all three stages (Steps 3 → 4–7 → 8–9).
-Closed-loop route completion does not — it drops when the labels get better (Step 4), then
-recovers only once DAgger (Step 9) addresses the distribution mismatch between training states
-and deployment states.*
+*Open-loop validation loss improves at every stage. Closed-loop route completion does not — it
+drops after the label fix (stage ii) then climbs as DAgger iterations add coverage of the states
+the policy actually visits during deployment.*
+
+![DAgger iteration progression](outputs/dagger_progress.png)
 
 ![BC + DAgger completing a nuScenes scenario](outputs/bc_vs_dagger4_nuscenes7.gif)
 
-*nuScenes scenario 7. Left: behavior cloning (Steps 4–7). Right: DAgger-iter-4 policy (Step 9)
-navigating to completion (95.3%). The **teal/green trail tracks the ego vehicle's driven path**
-in real time; surrounding vehicles (random colors) replay their logged trajectories.*
+*nuScenes scenario 7. Left: behavior cloning baseline (stage ii). Right: after 4 DAgger
+iterations (stage vi) — the policy completes the route at 95.3%. The **teal/green trail tracks
+the ego vehicle's driven path** in real time; surrounding vehicles (random colors) replay their
+logged trajectories.*
 
 ---
 
