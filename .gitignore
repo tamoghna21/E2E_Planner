@@ -1,0 +1,32 @@
+# ── Datasets and model checkpoints (regenerate by running the pipeline) ──────
+# /data/ (leading slash) anchors to the repo root, so src/data/ (Python package) is NOT excluded.
+/data/
+*.pt
+*.pth
+*.npz
+
+# ── Outputs: exclude everything by default, then re-include showcase files ────
+# NOTE: use `outputs/*` (not `outputs/`) so that the `!` negations below work.
+# With `outputs/` Git ignores the whole directory before checking negations;
+# with `outputs/*` it ignores the *contents* and negations take effect normally.
+outputs/*
+
+# Showcase GIFs — committed so the README renders on GitHub
+!outputs/bc_vs_dagger_waymo0.gif
+!outputs/bc_vs_dagger4_nuscenes7.gif
+!outputs/showcase_dagger_success.gif
+
+# Diagnostic and results figures — committed so README/docs render on GitHub
+!outputs/headline_figure.png
+!outputs/dagger_progress.png
+!outputs/lateral_drift.png
+!outputs/action_gap.png
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Third-party source clones (installed via `pip install -e` by setup_env.sh)
+metadrive/
+scenarionet/

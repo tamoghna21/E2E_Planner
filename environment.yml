@@ -1,0 +1,26 @@
+name: e2ecl
+# This file documents the environment spec. For a full reproducible install, use:
+#   bash scripts/setup_env.sh
+# (MetaDrive and ScenarioNet must be installed from source; torch requires the cu128 wheel index.)
+
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      # PyTorch — install from the cu128 wheel index (see setup_env.sh):
+      #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+      - torch==2.11.0+cu128
+      - torchvision==0.26.0+cu128
+      - imageio==2.37.3
+      - imageio-ffmpeg==0.6.0
+      - matplotlib==3.11.0
+      - pyyaml==6.0.3
+      - numpy==2.4.6
+      - pillow==12.2.0
+      # MetaDrive and ScenarioNet are installed from source (editable):
+      #   pip install -e ./metadrive
+      #   pip install -e ./scenarionet
+      # Then pull bundled scenario assets:
+      #   python -m metadrive.pull_asset

@@ -1,0 +1,35 @@
+# Single config for the whole pipeline: env, data split, model, training.
+
+dataset: nuscenes        # bundled mini split shipped with MetaDrive ("nuscenes" or "waymo")
+horizon: 1000             # max steps per episode
+
+obs_mode: state_vector    # state_vector (default) | bev_raster (stretch, Phase 6c)
+
+# Scenario indices are split into a contiguous train range and a disjoint contiguous
+# eval range. The eval range is held out from expert collection (Phase 2) entirely.
+scenario_split:
+  train_start: 0
+  train_num: 6
+  eval_start: 6
+  eval_num: 4
+  # Degenerate scenarios (reference_trajectory.length < 2m, i.e. ego is essentially stationary in
+  # the log) within the primary eval range -- excluded so they can't register as fake "successes".
+  # Found via src/eval/diagnose.py's scenario survey (Phase 4.5).
+  eval_exclude_indices: [9]
+  # Extra held-out scenarios from a second bundled dataset, added in Phase 4.5 so eval isn't
+  # reported over n<=3. None of these were ever used for expert collection.
+  eval_extra_dataset: waymo
+  eval_extra_num: 3
+
+model:
+  type: mlp
+  hidden_sizes: [128, 64]   # kept small: ~1.2k training transitions would overfit a larger net
+
+train:
+  batch_size: 64
+  epochs: 50
+  lr: 0.001
+  weight_decay: 0.0001
+  val_fraction: 0.1
+  amp: true
+  early_stop_patience: 10   # stop if val loss hasn't improved in this many epochs
