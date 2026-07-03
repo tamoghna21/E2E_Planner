@@ -373,9 +373,6 @@ Ross, Gordon, and Bagnell in 2011:
 > Conference on Artificial Intelligence and Statistics (AISTATS), 2011. PMLR vol. 15, pp. 627–635.*
 > [[arXiv:1011.0686]](https://arxiv.org/abs/1011.0686)
 
-It is one of the standard references for imitation learning. Citing it directly signals that
-DAgger is a named, theoretically grounded method — not an ad-hoc fix improvised for this project.
-
 ### The problem it solves: compounding error in behavior cloning
 
 Plain behavior cloning (BC) trains on the expert's state distribution, but at test time the
