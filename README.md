@@ -230,30 +230,26 @@ states along the expert's trajectory, but once it reached states slightly off th
 
 ### Step 9 — DAgger: closing the gap
 
-DAgger (*Dataset Aggregation*, [Ross, Gordon, Bagnell — AISTATS 2011](https://arxiv.org/abs/1011.0686))
-is the direct algorithmic response to covariate shift in imitation learning. The key insight: the
-distribution of states a policy *visits* during deployment differs from the distribution of states
-in the expert's demonstrations. DAgger corrects this by including the policy's visited states in
-the training data.
+DAgger (*Dataset Aggregation*) is the direct algorithmic response to covariate shift in imitation
+learning. See the [DAgger appendix](#appendix--dagger-in-depth) for the full theory, algorithm,
+and the reason this project's expert design was a prerequisite for DAgger to be applicable at all.
 
-Each DAgger iteration (`src/data/collect_dagger.py` → `src/train/run_dagger_iterations.py`):
+Each iteration (`src/data/collect_dagger.py` → `src/train/run_dagger_iterations.py`):
 
-1. **Roll out the current policy** under real physics on the training scenarios. The policy
-   drives; wherever it ends up — including near-boundary states where BC was unreliable — is
-   where the expert will be queried.
-2. **Query the reactive expert** at every state the policy visits. Because the expert is a
-   controller (not a log replay), it produces a meaningful `[steering, throttle/brake]` action
-   from any position — this is the property that makes DAgger applicable here.
-3. **Aggregate**: combine the new `(visited_state, expert_action)` pairs with all previously
-   collected data (`D_BC ∪ D_DAgger_1 ∪ …`).
-4. **Retrain** the same MLP on the full aggregate. No architectural changes.
-5. **Evaluate** on the held-out eval set and record metrics.
+1. **Roll out the current policy** under real physics on the training scenarios. Wherever the
+   policy ends up — including near-boundary states where BC was unreliable — is where the expert
+   will be queried.
+2. **Query the reactive expert** at every visited state. Because the expert is a controller (not
+   a log replay), it returns a meaningful action at any vehicle state.
+3. **Aggregate**: combine the new `(visited_state, expert_action)` pairs with all prior data
+   (`D_BC ∪ D_DAgger_1 ∪ …`).
+4. **Retrain** the same MLP on the full aggregate.
+5. **Evaluate** on the held-out eval set.
 
 The result after four iterations: success climbed from 0% → 17% → **67%** and then plateaued.
-The plateau itself is evidence: iterations 3 and 4 added ~1,750 more transitions but did not
-improve metrics, confirming that **distribution coverage** — not data volume — was the binding
-constraint. One scenario (`nuscenes:6`, a tight intersection) does not converge at any iteration,
-consistent with the training set never adequately covering that geometry.
+The plateau is evidence in itself: iterations 3 and 4 added ~1,750 more transitions but metrics
+did not improve, confirming **distribution coverage** — not data volume — was the binding
+constraint.
 
 ---
 
@@ -346,8 +342,9 @@ demonstration of exactly that phenomenon, and of the canonical imitation-learnin
 
 ## References
 
-- **DAgger:** Ross, S., Gordon, G., & Bagnell, D. (2011). A Reduction of Imitation Learning and
-  Structured Prediction to No-Regret Online Learning. *AISTATS 2011*.
+- **DAgger:** Ross, S., Gordon, G. J., & Bagnell, J. A. (2011). A Reduction of Imitation Learning
+  and Structured Prediction to No-Regret Online Learning. *Proceedings of the 14th International
+  Conference on Artificial Intelligence and Statistics (AISTATS), 2011. PMLR vol. 15, pp. 627–635.*
   [[arXiv:1011.0686]](https://arxiv.org/abs/1011.0686)
 - **MetaDrive:** Li, Q., et al. (2022). MetaDrive: Composing Diverse Driving Scenarios for
   Generalizable Reinforcement Learning. *IEEE TPAMI*.
@@ -361,3 +358,80 @@ demonstration of exactly that phenomenon, and of the canonical imitation-learnin
 Built on [MetaDrive](https://github.com/metadriverse/metadrive) and
 [ScenarioNet](https://github.com/metadriverse/scenarionet); scenarios from the bundled nuScenes
 and Waymo Open Motion mini splits.
+
+---
+
+## Appendix — DAgger in depth
+
+### What DAgger is
+
+**DAgger** (*Dataset Aggregation*) is a foundational imitation-learning algorithm introduced by
+Ross, Gordon, and Bagnell in 2011:
+
+> Stéphane Ross, Geoffrey J. Gordon, and J. Andrew Bagnell. "A Reduction of Imitation Learning
+> and Structured Prediction to No-Regret Online Learning." *Proceedings of the 14th International
+> Conference on Artificial Intelligence and Statistics (AISTATS), 2011. PMLR vol. 15, pp. 627–635.*
+> [[arXiv:1011.0686]](https://arxiv.org/abs/1011.0686)
+
+It is one of the standard references for imitation learning. Citing it directly signals that
+DAgger is a named, theoretically grounded method — not an ad-hoc fix improvised for this project.
+
+### The problem it solves: compounding error in behavior cloning
+
+Plain behavior cloning (BC) trains on the expert's state distribution, but at test time the
+policy visits its own state distribution. Any small per-step error moves the policy into states
+the expert never demonstrated. The policy then behaves worse at those unseen states, producing
+larger errors, which compound — this is the lateral drift you see in `outputs/lateral_drift.png`.
+
+Ross & Bagnell formalised this precisely: in the worst case, BC's total error over an episode of
+length *T* grows as **O(T² ε)** (quadratic in the horizon, where ε is the per-step imitation
+error). DAgger reduces that to **O(T ε)** — linear — by ensuring the training distribution
+matches the policy's actual deployment distribution. That quadratic-to-linear reduction is the
+core theoretical contribution of the paper.
+
+### The algorithm
+
+```
+1. Collect demonstrations from the expert → initial dataset D.
+2. Train policy π on D (ordinary behavior cloning for iteration 1).
+3. For each subsequent iteration:
+     a. Run policy π in the environment; record every state visited.
+     b. Query the expert for the correct action at each visited state.
+     c. Add those (visited-state, expert-action) pairs to D.
+     d. Retrain π on the full aggregated D.
+```
+
+The original paper mixes the expert and the current policy during rollouts with a probability β
+that decays across iterations (β = 1 in iteration 1, reducing toward 0). In this project,
+iteration 1 was pure BC, and from iteration 2 onward the policy drove exclusively — this is the
+common simplified variant. A reader familiar with the original should know the exact mixing
+schedule was not used.
+
+### Why DAgger required the expert redesign in this project
+
+The key requirement of DAgger is an **interactive, queryable expert**: something you can ask
+"what would you do in this exact state?" for *arbitrary* states the learner stumbles into, not
+only states drawn from a fixed demonstration dataset.
+
+The original "expert" used in Phase 2 of this project was `MetaDrive`'s `ReplayEgoCarPolicy` —
+it teleports the ego along the logged trajectory at each step, bypassing physics entirely. That
+policy is only defined *along the logged path*. It cannot be queried at a state 2 metres to the
+left of the log, or at a different speed. Running DAgger on top of it would be meaningless: the
+"expert" would have no valid answer for the states the policy actually visits when it drifts.
+
+The reactive **pure-pursuit + PID tracking controller** (`src/data/tracking_expert.py`) solves
+this: it is a function of the vehicle's *current* state (position, heading, speed) and returns a
+steering and throttle action from anywhere. It does not care whether the vehicle is on or off the
+logged path. This is precisely what makes DAgger applicable — the label fix in the middle of the
+project was not just a bug fix on the quality of BC data; it was the prerequisite that made the
+DAgger step possible at all.
+
+### What the plateau means
+
+After iteration 2, success rate stabilised at 66.7% despite adding ~1,750 more DAgger transitions
+in iterations 3 and 4. The plateau is informative: if the limit were data volume, more transitions
+would have continued to help. The fact that they did not indicates the remaining failures are due
+to **distribution coverage** — specifically, one scenario (`nuscenes:6`) involves a geometry
+(tight urban intersection) that the ~5 training scenarios never adequately represent, so no amount
+of DAgger transitions from those same training scenarios will cover it. The fix would be more
+diverse training scenarios, not more iterations on the existing ones.
