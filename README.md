@@ -10,47 +10,6 @@ the policy navigates through dense traffic and completes the route (95.8% route 
 In both panels the **teal/green trail is the ego vehicle's path** — the car being controlled by
 the learned policy. Surrounding vehicles replay their logged trajectories.*
 
----
-
-## Results
-
-**Three-stage progression** (n = 6 held-out scenarios: 3 nuScenes + 3 Waymo):
-
-| stage | open-loop val MSE | success | route completion |
-|---|---|---|---|
-| (i) heuristic labels, BC | 0.1405 | 0% | 29.7% |
-| (ii) reactive-expert labels, BC | 0.0678 | 0% | 19.7% |
-| (iii) BC + 1 DAgger iteration | 0.0642 | 16.7% | 37.5% |
-
-**DAgger iteration curve** (Phase 6a — 4 iterations total):
-
-| iteration | success | route completion |
-|---|---|---|
-| 0 — BC only | 0% | 19.7% |
-| 1 | 16.7% | 37.5% |
-| 2 | **66.7%** | **76.7%** |
-| 3 | 66.7% | 75.3% |
-| 4 | 66.7% | 76.1% |
-
-![DAgger iteration progression](outputs/dagger_progress.png)
-
-By iteration 2, **4 of 6 genuinely held-out real-world scenarios** are completed at 95%+ route
-completion. Performance then plateaus — the classic DAgger convergence signature.
-
-![The finding in one figure](outputs/headline_figure.png)
-
-*Open-loop validation loss improves monotonically across all three stages. Closed-loop route
-completion does not — it drops when labels get better, then recovers only once DAgger addresses
-the distribution mismatch between training states and deployment states.*
-
-![BC + DAgger completing a nuScenes scenario](outputs/bc_vs_dagger4_nuscenes7.gif)
-
-*nuScenes scenario 7. Left: behavior cloning. Right: DAgger-iter-4 policy navigating to
-completion (95.3%). The **teal/green trail tracks the ego vehicle's driven path** in real time;
-surrounding vehicles (random colors) replay their logged trajectories.*
-
----
-
 ## How it works
 
 This section walks through every component of the pipeline in the order they connect.
@@ -250,6 +209,46 @@ The result after four iterations: success climbed from 0% → 17% → **67%** an
 The plateau is evidence in itself: iterations 3 and 4 added ~1,750 more transitions but metrics
 did not improve, confirming **distribution coverage** — not data volume — was the binding
 constraint.
+
+---
+
+## Results
+
+**Three-stage progression** (n = 6 held-out scenarios: 3 nuScenes + 3 Waymo):
+
+| stage | pipeline steps | open-loop val MSE | success | route completion |
+|---|---|---|---|---|
+| (i) heuristic labels, BC | Steps 1–3 (data problem identified) | 0.1405 | 0% | 29.7% |
+| (ii) reactive-expert labels, BC | Steps 4–7 (expert fixed → trained → evaluated) | 0.0678 | 0% | 19.7% |
+| (iii) BC + 1 DAgger iteration | Steps 8–9 (gap diagnosed → DAgger applied) | 0.0642 | 16.7% | 37.5% |
+
+**DAgger iteration curve** (4 iterations beyond the BC baseline — Step 9):
+
+| iteration | pipeline step | success | route completion |
+|---|---|---|---|
+| 0 — BC only | Steps 4–7 baseline | 0% | 19.7% |
+| 1 | Step 9, first iteration | 16.7% | 37.5% |
+| 2 | Step 9, second iteration | **66.7%** | **76.7%** |
+| 3 | Step 9, third iteration | 66.7% | 75.3% |
+| 4 | Step 9, fourth iteration | 66.7% | 76.1% |
+
+![DAgger iteration progression](outputs/dagger_progress.png)
+
+By iteration 2, **4 of 6 genuinely held-out real-world scenarios** are completed at 95%+ route
+completion. Performance then plateaus — the classic DAgger convergence signature.
+
+![The finding in one figure](outputs/headline_figure.png)
+
+*Open-loop validation loss improves monotonically across all three stages (Steps 3 → 4–7 → 8–9).
+Closed-loop route completion does not — it drops when the labels get better (Step 4), then
+recovers only once DAgger (Step 9) addresses the distribution mismatch between training states
+and deployment states.*
+
+![BC + DAgger completing a nuScenes scenario](outputs/bc_vs_dagger4_nuscenes7.gif)
+
+*nuScenes scenario 7. Left: behavior cloning (Steps 4–7). Right: DAgger-iter-4 policy (Step 9)
+navigating to completion (95.3%). The **teal/green trail tracks the ego vehicle's driven path**
+in real time; surrounding vehicles (random colors) replay their logged trajectories.*
 
 ---
 
